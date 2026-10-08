@@ -54,7 +54,7 @@ object PetStudyTask {
             return StudyDispatchResult(code = evtCode, errorMsg = "课程查询失败")
         }
         onLog("📚 [课程拉取] 服务端返回 ${dynamicEvents.size} 门课程")
-        val targetCourse = filterAndSelectCourse(dynamicEvents, param)
+        val targetCourse = filterAndSelectCourse(dynamicEvents, param, onLog)
         if (targetCourse == null) {
             onLog("⚠️ [学园调度] 阶段 $targetStage 没有与所设科目或时长匹配的课程，本次不报名")
             return StudyDispatchResult(code = -3, errorMsg = "没有与所设科目或时长匹配的课程")
@@ -86,7 +86,11 @@ object PetStudyTask {
         return if (details.code == 0 && details.currentStage > 0) details.currentStage else 0
     }
 
-    private fun filterAndSelectCourse(events: List<QQPetDirectBridge.SelectEvent>, param: StudyDispatchParam): QQPetDirectBridge.SelectEvent? {
+    private fun filterAndSelectCourse(
+        events: List<QQPetDirectBridge.SelectEvent>,
+        param: StudyDispatchParam,
+        onLog: (String) -> Unit = {}
+    ): QQPetDirectBridge.SelectEvent? {
         val available = events.filter { it.canDo }.ifEmpty { events }
         if (available.isEmpty()) return null
         val durationFiltered = when (param.customCourseDuration) {
@@ -108,12 +112,21 @@ object PetStudyTask {
         }
         val byReward = if (rewardKey.isNotEmpty()) durationFiltered.find { it.reward.contains(rewardKey) } else null
         if (byReward != null) return byReward
+
+        // reward 文案没命中：打印候选现场，便于后续按真实 subEvent/reward 校准
         val subRange = when (param.customCourseSubject) {
             1 -> 6100L..6199L
             2 -> 6200L..6299L
             3 -> 6300L..6399L
             else -> return null
         }
-        return durationFiltered.find { it.subEventType in subRange }
+        val bySub = durationFiltered.find { it.subEventType in subRange }
+        if (bySub == null) {
+            onLog("🔍 [课程科目] reward 未含「$rewardKey」且 subEvent 不在 $subRange，候选现场：")
+            durationFiltered.take(8).forEach {
+                onLog("    · subEvent=${it.subEventType} name=${it.eventName} reward=${it.reward} costTime=${it.costTime}")
+            }
+        }
+        return bySub
     }
 }

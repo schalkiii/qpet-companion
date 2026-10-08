@@ -122,6 +122,10 @@ class PetAdventureEngine(private var bridge: QQPetDirectBridge) {
     private var loopJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    /** 主循环重入保护：wakeUpMasterCycle 取消旧协程是异步的，避免新旧两轮并发发包 */
+    @Volatile
+    private var cycleInFlight = false
+
     fun updateBridge(newBridge: QQPetDirectBridge) { this.bridge = newBridge }
     fun sendLog(context: Context, message: String) = Companion.sendLog(context, message)
 
@@ -166,6 +170,19 @@ class PetAdventureEngine(private var bridge: QQPetDirectBridge) {
     }
 
     suspend fun executeMasterCycle(context: Context): Long {
+        if (cycleInFlight) {
+            Log.i(TAG, "主循环上一轮尚未结束，本轮跳过避免并发发包")
+            return 5_000L
+        }
+        cycleInFlight = true
+        try {
+            return executeMasterCycleInternal(context)
+        } finally {
+            cycleInFlight = false
+        }
+    }
+
+    private suspend fun executeMasterCycleInternal(context: Context): Long {
         reloadConfig(context)
         checkStealthWindows(context)?.let { return it }
         ensureReadyBridge(context)?.let { return it }
