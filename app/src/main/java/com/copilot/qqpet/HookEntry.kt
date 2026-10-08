@@ -219,6 +219,9 @@ class HookEntry : IXposedHookLoadPackage {
             val prefs = appContext.getSharedPreferences("qqpet_inproc_prefs", Context.MODE_PRIVATE)
             HookLog.isDebugEnabled = prefs.getBoolean(PreferencesHelper.KEY_DEBUG_LOG, false)
         } catch (_: Throwable) {}
+        try {
+            com.copilot.qqpet.hook.FileLogger.bind(appContext)
+        } catch (_: Throwable) {}
 
         if (globalEngine == null || globalBridge?.isReady != true) {
             try {

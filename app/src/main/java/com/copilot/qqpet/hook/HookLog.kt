@@ -13,6 +13,11 @@ object HookLog {
     var isDebugEnabled: Boolean = false
 
     fun log(tag: String, msg: String) {
+        // 常驻落盘：无论调试开关是否打开，都持续追加到 engine.log，方便事后拉回现场
+        try {
+            FileLogger.log(tag, msg)
+        } catch (_: Throwable) {
+        }
         if (isDebugEnabled) {
             try {
                 XposedBridge.log("[$tag] $msg")

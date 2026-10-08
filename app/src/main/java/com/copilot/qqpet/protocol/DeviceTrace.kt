@@ -25,6 +25,11 @@ object DeviceTrace {
             val line = if (chunks.size == 1) chunk else "(${index + 1}/${chunks.size})$chunk"
             Log.i(TAG, line.take(3500))
             appendLine(line)
+            // 同时汇入常驻 engine.log，与引擎调度日志放在一起便于对照
+            try {
+                com.copilot.qqpet.hook.FileLogger.log(TAG, line)
+            } catch (_: Throwable) {
+            }
         }
     }
 

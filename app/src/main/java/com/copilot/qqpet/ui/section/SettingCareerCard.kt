@@ -20,6 +20,7 @@ import com.copilot.qqpet.protocol.QQPetDirectBridge
 import com.copilot.qqpet.ui.component.AppleSegmentedControl
 import com.copilot.qqpet.ui.component.AppleSwitchView
 import com.copilot.qqpet.ui.component.SegmentItem
+import com.copilot.qqpet.ui.component.WorkPlaceOption
 import com.copilot.qqpet.ui.dialog.HireFriendWhitelistDialog
 import com.copilot.qqpet.ui.theme.ThemeColors
 import com.copilot.qqpet.ui.util.CardUiBuilder
@@ -43,6 +44,9 @@ class SettingCareerCard(
     private var workTypeSeg: AppleSegmentedControl? = null
     private var workSubtitleTv: TextView? = null
     private var workDurSeg: AppleSegmentedControl? = null
+
+    /** 当前界面上真实展示的打工场所列表，必须与 workTypeSeg 内 rebuildItems 后的顺序一致。 */
+    private var currentWorkPlaceOptions: List<WorkPlaceOption> = emptyList()
 
     fun build(container: LinearLayout): View {
         CardUiBuilder.addSectionHeader(container, "自动轮转调度", colors)
@@ -154,6 +158,7 @@ class SettingCareerCard(
     fun updateWorkUnlockStates(details: QQPetDirectBridge.SecondMapDetails?, jobs: List<QQPetDirectBridge.SelectEvent>?) {
         if (details == null || details.code != 0) return
         val options = UiDescUtils.buildWorkPlaceOptions(details)
+        currentWorkPlaceOptions = options
         val curWorkType = prefs.getInt(PreferencesHelper.KEY_WORK_TYPE, 0)
         val selectedIdx = options.indexOfFirst { it.careerId == curWorkType }.let { if (it >= 0) it else 0 }
         val segItems = options.map { SegmentItem(it.title, enabled = it.enabled, disabledTip = it.disabledTip) }
@@ -206,6 +211,7 @@ class SettingCareerCard(
 
     private fun buildWorkControls(panel: LinearLayout, subtitleTv: TextView, initialIdx: Int) {
         val workPlaceOptions = UiDescUtils.buildWorkPlaceOptions(PetAdventureEngine.cachedWorkPlaces)
+        currentWorkPlaceOptions = workPlaceOptions
         panel.addView(TextView(context).apply { text = "打工场所 (职业小镇动态识别)"; textSize = 12f; setTextColor(colors.secondaryText); setPadding(0, UiAnimUtils.dp(context, 4), 0, UiAnimUtils.dp(context, 4)) })
 
         val scroll = HorizontalScrollView(context).apply {
@@ -213,7 +219,8 @@ class SettingCareerCard(
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
         val typeSeg = AppleSegmentedControl(context, workPlaceOptions.map { SegmentItem(it.title, enabled = it.enabled, disabledTip = it.disabledTip) }, initialIdx, isScrollable = true, isNight = colors.isNight) { sel ->
-            val opt = workPlaceOptions.getOrNull(sel) ?: return@AppleSegmentedControl
+            // 用当前展示列表反查 careerId，避免异步刷新顺序后存错场所
+            val opt = currentWorkPlaceOptions.getOrNull(sel) ?: return@AppleSegmentedControl
             prefs.edit().putInt(PreferencesHelper.KEY_WORK_TYPE, opt.careerId).commit()
             subtitleTv.text = UiDescUtils.getWorkTypeDesc(opt.careerId, opt.title, PetAdventureEngine.cachedWorkPlaces)
             SettingConfigSyncer.syncConfig(prefs, engine, context)

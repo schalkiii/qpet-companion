@@ -95,11 +95,25 @@ object PetStudyTask {
             else -> available
         }
         if (durationFiltered.isEmpty()) return null
-        return when (param.customCourseSubject) {
-            1 -> durationFiltered.find { it.reward.contains("智力") }
-            2 -> durationFiltered.find { it.reward.contains("力量") }
-            3 -> durationFiltered.find { it.reward.contains("魅力") }
-            else -> durationFiltered[param.studyAttributeCursor % durationFiltered.size]
+        if (param.customCourseSubject == 0) {
+            return durationFiltered[param.studyAttributeCursor % durationFiltered.size]
         }
+        // 优先按 reward 文案里的三围属性匹配；匹配不到再用 subEvent 段位兜底
+        // (61xx=智力/文科, 62xx=力量/体育, 63xx=魅力/艺术，与历史候选池一致)
+        val rewardKey = when (param.customCourseSubject) {
+            1 -> "智力"
+            2 -> "力量"
+            3 -> "魅力"
+            else -> ""
+        }
+        val byReward = if (rewardKey.isNotEmpty()) durationFiltered.find { it.reward.contains(rewardKey) } else null
+        if (byReward != null) return byReward
+        val subRange = when (param.customCourseSubject) {
+            1 -> 6100L..6199L
+            2 -> 6200L..6299L
+            3 -> 6300L..6399L
+            else -> return null
+        }
+        return durationFiltered.find { it.subEventType in subRange }
     }
 }
